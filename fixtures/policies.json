@@ -1,0 +1,37 @@
+{
+  "project": "Voice Agent Reliability Lab",
+  "criteria": [
+    {
+      "criterion_id": "crit_01",
+      "text": "Synthetic voice-call traces with latency, interruption, silence, noise, sentiment, and outcome signals.",
+      "requires_evidence": true
+    },
+    {
+      "criterion_id": "crit_02",
+      "text": "Replay-case compilation for recurring failure modes and release regression gates.",
+      "requires_evidence": true
+    },
+    {
+      "criterion_id": "crit_03",
+      "text": "Evidence verification for every generated claim before dashboard export.",
+      "requires_evidence": true
+    },
+    {
+      "criterion_id": "crit_04",
+      "text": "Offline dashboard generated as a static HTML artifact.",
+      "requires_evidence": true
+    },
+    {
+      "criterion_id": "crit_05",
+      "text": "Evidence verifier rejects unsupported or unknown claims.",
+      "requires_evidence": true
+    }
+  ],
+  "negative_controls": [
+    {
+      "control_id": "unsupported_claim",
+      "text": "CLAIM: this impressive claim has no evidence marker",
+      "should_fail_verification": true
+    }
+  ]
+}

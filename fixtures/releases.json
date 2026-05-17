@@ -1,0 +1,13 @@
+{
+  "seed": 42,
+  "baseline": "synthetic-v1",
+  "candidate": "synthetic-v2",
+  "planted_regressions": [
+    "rec_0000",
+    "rec_0005",
+    "rec_0010",
+    "rec_0015",
+    "rec_0020",
+    "rec_0025"
+  ]
+}

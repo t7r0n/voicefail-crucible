@@ -1,0 +1,34 @@
+[project]
+name = "hamming-ai-voice-reliability-lab"
+version = "0.1.0"
+description = "Voice Agent Chaos Lab: Production Failure Replay and Regression Firewall"
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=1.3.0",
+    "jinja2>=3.1.0",
+    "networkx>=3.4.0",
+    "plotly>=6.0.0",
+    "pydantic>=2.10.0",
+    "rich>=13.9.0",
+    "typer>=0.15.0",
+]
+
+[project.scripts]
+app = "app.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.11.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
