@@ -2,13 +2,19 @@
 
 A local-first replay and release-gating prototype for voice-agent failure modes, with deterministic traces, evidence-backed reports, and an offline dashboard.
 
-## Features
+`hamming-ai-voice-reliability-lab` favors explicit fixtures, deterministic checks, and reviewable artifacts over hidden services or live data.
+
+## Thesis
+
+Voice Agent Chaos Lab: Production Failure Replay and Regression Firewall.
+
+## Primitives
 
 - Synthetic voice-call traces with latency, interruption, silence, noise, sentiment, and outcome signals.
 - Replay-case compilation for recurring failure modes and release regression gates.
 - Evidence verification for every generated claim before dashboard export.
 
-## Run Locally
+## Reproduce locally
 
 ```bash
 uv sync
@@ -23,7 +29,7 @@ uv run pytest -q
 uv run ruff check .
 ```
 
-## Outputs
+## Review packet
 
 - `outputs/dashboard.html`
 - `outputs/decision_report.md`
@@ -32,6 +38,14 @@ uv run ruff check .
 - `outputs/benchmark.md`
 - `outputs/demo_pack.md`
 
-## Data Policy
+## Confidence checks
 
-This project runs fully locally on deterministic synthetic fixtures. It does not require external APIs, credentials, private datasets, network access, or production systems.
+```bash
+uv run ruff check .
+uv run pytest -q
+uv run app verify
+```
+
+## Data limits
+
+`Voice Agent Reliability Lab` is built for local reproduction: deterministic inputs enter the run, deterministic evidence comes out, and private data stays outside the repo.
