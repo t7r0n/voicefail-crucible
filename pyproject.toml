@@ -1,5 +1,5 @@
 [project]
-name = "voicefail-crucible"
+name = "voice-reliability-lab"
 version = "0.1.0"
 description = "Voice Agent Chaos Lab: Production Failure Replay and Regression Firewall"
 requires-python = ">=3.12"

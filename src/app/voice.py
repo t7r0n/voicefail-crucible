@@ -89,7 +89,7 @@ FAILURE_RULES = [
 
 
 def should_enable(config: dict[str, Any]) -> bool:
-    return config.get("slug") == "voicefail-crucible"
+    return config.get("slug") == "voice-reliability-lab"
 
 
 def generate_voice_traces(fixtures: Path, seed: int, calls: int = 84) -> dict[str, Any]:

@@ -1,5 +1,5 @@
 {
-  "seed": 42,
+  "seed": 99,
   "baseline": "synthetic-v1",
   "candidate": "synthetic-v2",
   "planted_regressions": [
@@ -7,7 +7,6 @@
     "rec_0005",
     "rec_0010",
     "rec_0015",
-    "rec_0020",
-    "rec_0025"
+    "rec_0020"
   ]
 }

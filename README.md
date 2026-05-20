@@ -3,7 +3,7 @@
 ![Voice Agent Reliability Lab working preview](outputs/project_working.svg)
 A local-first replay and release-gating prototype for voice-agent failure modes, with deterministic traces, evidence-backed reports, and an offline dashboard.
 
-`voicefail-crucible` favors explicit fixtures, deterministic checks, and reviewable artifacts over hidden services or live data.
+`voice-reliability-lab` favors explicit fixtures, deterministic checks, and reviewable artifacts over hidden services or live data.
 
 ## Thesis
 

@@ -1,5 +1,5 @@
 {
-  "slug": "voicefail-crucible",
+  "slug": "voice-reliability-lab",
   "company": "Voice Agent Reliability Lab",
   "title": "Voice Agent Reliability Lab",
   "thesis": "A local-first replay and release-gating prototype for voice-agent failure modes, with deterministic traces, evidence-backed reports, and an offline dashboard.",
