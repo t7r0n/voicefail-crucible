@@ -141,3 +141,42 @@ def test_dashboard_escapes_fixture_html() -> None:
     dashboard = Path(core.dashboard(PROJECT_ROOT)["dashboard"]).read_text(encoding="utf-8")
     assert "<script>alert('xss')</script>" not in dashboard
     assert "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;" in dashboard
+
+
+def test_visual_svgs_are_bounded_and_regenerated() -> None:
+    reset_runtime()
+    core.init_demo(PROJECT_ROOT, seed=88, records=40)
+    core.ingest(PROJECT_ROOT)
+    core.analyze(PROJECT_ROOT)
+    core.verify(PROJECT_ROOT)
+    core.dashboard(PROJECT_ROOT)
+
+    import xml.etree.ElementTree as ET
+
+    for name in ["project_working.svg", "evidence_map.svg"]:
+        svg_path = PROJECT_ROOT / "outputs" / name
+        assert svg_path.exists()
+        root = ET.fromstring(svg_path.read_text(encoding="utf-8"))
+        _, _, width, height = [float(item) for item in root.attrib["viewBox"].split()]
+        for rect in root.findall(".//{http://www.w3.org/2000/svg}rect"):
+            x = float(rect.attrib.get("x", 0))
+            y = float(rect.attrib.get("y", 0))
+            w = float(rect.attrib.get("width", 0))
+            h = float(rect.attrib.get("height", 0))
+            assert x >= 0 and y >= 0
+            assert x + w <= width
+            assert y + h <= height
+
+
+def test_dashboard_has_single_domain_panel_after_visual_pass() -> None:
+    reset_runtime()
+    core.init_demo(PROJECT_ROOT, seed=89, records=40)
+    core.ingest(PROJECT_ROOT)
+    analysis = core.analyze(PROJECT_ROOT)
+    core.verify(PROJECT_ROOT)
+    dashboard_path = Path(core.dashboard(PROJECT_ROOT)["dashboard"])
+    dashboard = dashboard_path.read_text(encoding="utf-8")
+    domain_title = analysis["domain"].get("dashboard_title", "Voice replay failure modes")
+    assert dashboard.count(domain_title) == 1
+    assert "project_working.svg" in dashboard
+    assert "evidence_map.svg" in dashboard

@@ -463,7 +463,174 @@ def dashboard(root: Path | None = None) -> dict[str, Any]:
         raise DataContractError("missing outputs/analysis.json; run analyze first")
     analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
     clusters = analysis["clusters"]
-    voice_domain = analysis.get("domain") or {}
+    domain_analysis = analysis.get("domain") or {}
+    if "replay_cases" in domain_analysis and "dashboard_title" not in domain_analysis:
+        domain_analysis = {
+            "dashboard_title": "Voice replay failure modes",
+            "primary_label": "Risk score",
+            "cases": [
+                {
+                    "subject": case["failure_mode"].replace("_", " "),
+                    "recommendation": case["expected_guardrail"],
+                    "reason": f"{case['release']} replay over {len(case['source_turn_ids'])} source turns",
+                    "score": case["risk_score"],
+                    "evidence_id": case["evidence_id"],
+                    "evidence": ", ".join(case["source_turn_ids"]),
+                }
+                for case in domain_analysis["replay_cases"]
+            ],
+        }
+
+    def svg_escape(value: object) -> str:
+        return (
+            str(value)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+        )
+
+    def svg_short(value: object, limit: int = 46) -> str:
+        cleaned = " ".join(str(value).split())
+        return cleaned if len(cleaned) <= limit else cleaned[: limit - 3].rstrip() + "..."
+
+    def svg_lines(value: object, limit: int = 34, max_lines: int = 2) -> list[str]:
+        words = " ".join(str(value).split()).split()
+        lines: list[str] = []
+        current: list[str] = []
+        for word in words:
+            candidate = " ".join([*current, word])
+            if len(candidate) <= limit:
+                current.append(word)
+                continue
+            if current:
+                lines.append(" ".join(current))
+            current = [word]
+            if len(lines) == max_lines:
+                break
+        if current and len(lines) < max_lines:
+            lines.append(" ".join(current))
+        if len(lines) == max_lines and len(" ".join(words)) > len(" ".join(lines)):
+            lines[-1] = svg_short(lines[-1], max(8, limit - 1))
+        return lines or [""]
+
+    def svg_text(value: object, x: int, y: int, cls: str, limit: int, max_lines: int, line_height: int) -> str:
+        spans = [f'<text class="{cls}" x="{x}" y="{y}">']
+        for index, line in enumerate(svg_lines(value, limit=limit, max_lines=max_lines)):
+            dy = 0 if index == 0 else line_height
+            spans.append(f'<tspan x="{x}" dy="{dy}">{svg_escape(line)}</tspan>')
+        spans.append("</text>")
+        return "".join(spans)
+
+    top = sorted(clusters, key=lambda item: (item["failures"], item["escalations"], item["average_severity"]), reverse=True)[:4]
+    colors = ["#2563eb", "#0f766e", "#7c3aed", "#ca8a04"]
+    bars = []
+    cards = []
+    for index, item in enumerate(top):
+        y = 366 + index * 68
+        width = min(390, 180 + int(float(item["average_severity"]) * 42))
+        bars.append(
+            f'<text class="label" x="92" y="{y - 12}">{svg_escape(svg_short(item["scenario"], 40))}</text>'
+            f'<text class="mono" x="462" y="{y - 12}">{svg_escape(item["top_evidence_id"])}</text>'
+            f'<rect x="92" y="{y}" width="396" height="14" rx="7" fill="#e5e7eb"/>'
+            f'<rect x="92" y="{y}" width="{width}" height="14" rx="7" fill="{colors[index % len(colors)]}"/>'
+            f'<text class="caption" x="92" y="{y + 40}">{svg_escape(item["recommended_action"])}</text>'
+        )
+        card_x = 626 + (index % 2) * 238
+        card_y = 350 + (index // 2) * 144
+        cards.append(
+            f'<rect class="actioncard" x="{card_x}" y="{card_y}" width="212" height="118" rx="8"/>'
+            f'<text class="rank" x="{card_x + 18}" y="{card_y + 28}">decision {index + 1}</text>'
+            + svg_text(item["recommended_action"], card_x + 18, card_y + 56, "cardtext", 24, 3, 17)
+            + f'<text class="mono" x="{card_x + 18}" y="{card_y + 102}">{svg_escape(item["top_evidence_id"])}</text>'
+        )
+
+    title = config["title"]
+    thesis = config["thesis"]
+    working_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="700" viewBox="0 0 1120 700" role="img" aria-label="{svg_escape(title)} working dashboard">
+  <defs>
+    <style>
+      .bg {{ fill:#f8fafc; }}
+      .panel,.card,.actioncard {{ fill:#ffffff; stroke:#d8e1ec; stroke-width:1.1; }}
+      .title {{ font:760 30px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#111827; }}
+      .sub {{ font:420 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#475569; }}
+      .label {{ font:700 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#1f2937; }}
+      .caption {{ font:500 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#64748b; }}
+      .small {{ font:650 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#64748b; }}
+      .metric {{ font:780 29px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#0f172a; }}
+      .rank {{ font:760 13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#2563eb; }}
+      .cardtext {{ font:650 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#142033; }}
+      .mono {{ font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace; fill:#334155; }}
+    </style>
+  </defs>
+  <rect class="bg" width="1120" height="700"/>
+  <rect class="panel" x="28" y="28" width="1064" height="644" rx="8"/>
+  <text class="title" x="64" y="76">{svg_escape(title)} Evidence Console</text>
+  {svg_text(thesis, 64, 108, "sub", 86, 2, 22)}
+  <rect class="card" x="64" y="166" width="232" height="84" rx="8"/>
+  <text class="small" x="84" y="194">records analyzed</text>
+  <text class="metric" x="84" y="230">{analysis["records"]}</text>
+  <rect class="card" x="320" y="166" width="232" height="84" rx="8"/>
+  <text class="small" x="340" y="194">failures</text>
+  <text class="metric" x="340" y="230">{analysis["status_counts"]["fail"]}</text>
+  <rect class="card" x="576" y="166" width="480" height="84" rx="8"/>
+  <text class="small" x="596" y="194">highest-risk scenario</text>
+  {svg_text(top[0]["scenario"], 596, 224, "label", 56, 1, 16)}
+  <rect class="card" x="64" y="292" width="492" height="338" rx="8"/>
+  <text class="label" x="92" y="322">risk scenarios with cited evidence</text>
+  {''.join(bars)}
+  <text class="label" x="626" y="324">operator decisions</text>
+  {''.join(cards)}
+</svg>
+"""
+    nodes = []
+    edges = []
+    for index, item in enumerate(top):
+        y = 118 + index * 88
+        nodes.append(
+            f'<rect class="lane" x="64" y="{y}" width="178" height="56" rx="8"/>'
+            + svg_text(item["scenario"], 78, y + 23, "node", 21, 2, 16)
+            + f'<rect class="failure" x="294" y="{y}" width="186" height="56" rx="8"/>'
+            + svg_text(f"{item['failures']} fail / {item['escalations']} review", 308, y + 32, "node", 24, 1, 16)
+            + f'<rect class="evidencebox" x="548" y="{y}" width="146" height="56" rx="8"/>'
+            + f'<text class="mono" x="575" y="{y + 35}">{svg_escape(item["top_evidence_id"])}</text>'
+            + f'<rect class="actionbox" x="764" y="{y}" width="292" height="56" rx="8"/>'
+            + svg_text(item["recommended_action"], 778, y + 23, "node", 36, 2, 16)
+        )
+        edges.extend(
+            [
+                f'<path d="M242 {y + 28} L294 {y + 28}" class="edge"/>',
+                f'<path d="M480 {y + 28} L548 {y + 28}" class="edge"/>',
+                f'<path d="M694 {y + 28} L764 {y + 28}" class="edge"/>',
+            ]
+        )
+    evidence_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="500" viewBox="0 0 1120 500" role="img" aria-label="{svg_escape(title)} evidence map">
+  <defs>
+    <style>
+      .bg {{ fill:#f8fafc; }}
+      .panel {{ fill:#ffffff; stroke:#d8e1ec; stroke-width:1.1; }}
+      .title {{ font:760 28px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#111827; }}
+      .node {{ font:620 13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#1f2937; }}
+      .head {{ font:700 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#64748b; }}
+      .mono {{ font:720 13px ui-monospace,SFMono-Regular,Menlo,monospace; fill:#334155; }}
+      .edge {{ stroke:#94a3b8; stroke-width:2; fill:none; marker-end:url(#arrow); }}
+      .lane {{ fill:#eff6ff; stroke:#dbeafe; }}
+      .failure {{ fill:#ecfeff; stroke:#bae6fd; }}
+      .evidencebox {{ fill:#fef9c3; stroke:#fde68a; }}
+      .actionbox {{ fill:#f0fdf4; stroke:#bbf7d0; }}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/></marker>
+  </defs>
+  <rect class="bg" width="1120" height="500"/>
+  <rect class="panel" x="28" y="28" width="1064" height="444" rx="8"/>
+  <text x="56" y="70" class="title">{svg_escape(title)} evidence path</text>
+  <text x="64" y="104" class="head">scenario</text><text x="294" y="104" class="head">status mix</text><text x="548" y="104" class="head">evidence</text><text x="764" y="104" class="head">decision</text>
+  {''.join(edges)}
+  {''.join(nodes)}
+</svg>
+"""
+    (outputs / "project_working.svg").write_text(working_svg, encoding="utf-8")
+    (outputs / "evidence_map.svg").write_text(evidence_svg, encoding="utf-8")
 
     bar = go.Figure(
         data=[
@@ -474,21 +641,10 @@ def dashboard(root: Path | None = None) -> dict[str, Any]:
             )
         ]
     )
-    bar.update_layout(
-        title="Average Severity by Scenario",
-        template="plotly_white",
-        margin={"l": 40, "r": 20, "t": 60, "b": 120},
-    )
+    bar.update_layout(title="Average Severity by Scenario", template="plotly_white", margin={"l": 40, "r": 20, "t": 60, "b": 120})
     status = analysis["status_counts"]
     pie = go.Figure(
-        data=[
-            go.Pie(
-                labels=list(status.keys()),
-                values=list(status.values()),
-                marker={"colors": ["#16a34a", "#dc2626", "#f59e0b"]},
-                hole=0.45,
-            )
-        ]
+        data=[go.Pie(labels=list(status.keys()), values=list(status.values()), marker={"colors": ["#16a34a", "#dc2626", "#f59e0b"]}, hole=0.45)]
     )
     pie.update_layout(title="Outcome Mix", template="plotly_white")
 
@@ -501,21 +657,25 @@ def dashboard(root: Path | None = None) -> dict[str, Any]:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }}</title>
   <style>
-    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
     body { margin: 0; background: #f8fafc; color: #111827; }
     main { max-width: 1180px; margin: 0 auto; padding: 32px 20px 48px; }
     header { display: grid; gap: 8px; margin-bottom: 24px; }
     h1 { font-size: 30px; margin: 0; letter-spacing: 0; }
-    p { color: #4b5563; line-height: 1.55; }
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 22px 0; }
+    h2 { font-size: 18px; margin: 0 0 12px; letter-spacing: 0; }
+    p { color: #4b5563; line-height: 1.55; max-width: 900px; }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 22px 0; }
     .stat, .panel, table { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
     .stat { padding: 16px; }
     .stat strong { display: block; font-size: 26px; }
-    .panel { padding: 14px; margin: 14px 0; }
-    table { width: 100%; border-collapse: collapse; overflow: hidden; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; }
+    .panel { padding: 14px; margin: 14px 0; overflow: hidden; }
+    .visual { display: block; width: 100%; height: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: white; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; vertical-align: top; }
     th { background: #eef2ff; }
-    code { background: #eef2ff; padding: 2px 5px; border-radius: 5px; }
+    tr:last-child td { border-bottom: 0; }
+    code { background: #eef2ff; padding: 2px 5px; border-radius: 5px; white-space: nowrap; }
     @media (prefers-color-scheme: dark) {
       body { background: #0f172a; color: #e5e7eb; }
       p { color: #cbd5e1; }
@@ -523,6 +683,12 @@ def dashboard(root: Path | None = None) -> dict[str, Any]:
       th { background: #1e293b; }
       th, td { border-color: #334155; }
       code { background: #1e293b; }
+      .visual { border-color: #334155; }
+    }
+    @media (max-width: 760px) {
+      main { padding: 26px 14px 44px; }
+      .stats { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
     }
   </style>
 </head>
@@ -537,39 +703,16 @@ def dashboard(root: Path | None = None) -> dict[str, Any]:
     <div class="stat"><span>Failures</span><strong>{{ failures }}</strong></div>
     <div class="stat"><span>Escalations</span><strong>{{ escalations }}</strong></div>
   </section>
-  {% if voice_domain %}
+  <section class="panel"><h2>Working readout</h2><img class="visual" src="project_working.svg" alt="{{ title }} working readout"></section>
+  <section class="panel"><h2>Evidence path</h2><img class="visual" src="evidence_map.svg" alt="{{ title }} evidence path"></section>
+  {% if domain_analysis %}
   <section class="panel">
-    <h2>Voice Release Gate</h2>
+    <h2>{{ domain_analysis.dashboard_title }}</h2>
     <table>
-      <thead>
-        <tr><th>Release</th><th>Gate</th><th>Fail Rate</th><th>P95 Latency</th><th>Barge-ins</th></tr>
-      </thead>
+      <thead><tr><th>Subject</th><th>Recommendation</th><th>Reason</th><th>{{ domain_analysis.primary_label }}</th><th>Evidence</th><th>Source</th></tr></thead>
       <tbody>
-      {% for gate in voice_domain.release_gate %}
-      <tr>
-        <td>{{ gate.release }}</td>
-        <td><strong>{{ gate.gate }}</strong></td>
-        <td>{{ gate.fail_rate }}</td>
-        <td>{{ gate.p95_latency_ms }} ms</td>
-        <td>{{ gate.barge_in_violations }}</td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </section>
-  <section class="panel">
-    <h2>Replay Firewall</h2>
-    <table>
-      <thead><tr><th>Replay</th><th>Failure Mode</th><th>Risk</th><th>Guardrail</th><th>Evidence</th></tr></thead>
-      <tbody>
-      {% for case in voice_domain.replay_cases %}
-      <tr>
-        <td>{{ case.replay_id }}</td>
-        <td>{{ case.failure_mode }}</td>
-        <td>{{ case.risk_score }}</td>
-        <td>{{ case.expected_guardrail }}</td>
-        <td><code>{{ case.evidence_id }}</code></td>
-      </tr>
+      {% for case in domain_analysis.cases %}
+      <tr><td>{{ case.subject }}</td><td>{{ case.recommendation }}</td><td>{{ case.reason }}</td><td>{{ case.score }}</td><td><code>{{ case.evidence_id }}</code></td><td>{{ case.evidence }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -583,12 +726,7 @@ def dashboard(root: Path | None = None) -> dict[str, Any]:
       <thead><tr><th>Scenario</th><th>Action</th><th>Evidence</th><th>Severity</th></tr></thead>
       <tbody>
       {% for item in clusters %}
-      <tr>
-        <td>{{ item.scenario }}</td>
-        <td>{{ item.recommended_action }}</td>
-        <td><code>{{ item.top_evidence_id }}</code></td>
-        <td>{{ item.average_severity }}</td>
-      </tr>
+      <tr><td>{{ item.scenario }}</td><td>{{ item.recommended_action }}</td><td><code>{{ item.top_evidence_id }}</code></td><td>{{ item.average_severity }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -598,13 +736,13 @@ def dashboard(root: Path | None = None) -> dict[str, Any]:
 </html>"""
     )
     html = template.render(
-        title=config["title"],
-        thesis=config["thesis"],
+        title=title,
+        thesis=thesis,
         records=analysis["records"],
         failures=analysis["status_counts"]["fail"],
         escalations=analysis["status_counts"]["escalate"],
         clusters=clusters,
-        voice_domain=voice_domain,
+        domain_analysis=domain_analysis,
         bar=Markup(bar.to_html(full_html=False, include_plotlyjs="inline")),
         pie=Markup(pie.to_html(full_html=False, include_plotlyjs=False)),
     )
