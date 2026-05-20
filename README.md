@@ -1,5 +1,6 @@
 # Voice Agent Reliability Lab
 
+![Voice Agent Reliability Lab working preview](outputs/project_working.svg)
 A local-first replay and release-gating prototype for voice-agent failure modes, with deterministic traces, evidence-backed reports, and an offline dashboard.
 
 `hamming-ai-voice-reliability-lab` favors explicit fixtures, deterministic checks, and reviewable artifacts over hidden services or live data.
@@ -49,3 +50,5 @@ uv run app verify
 ## Data limits
 
 `Voice Agent Reliability Lab` is built for local reproduction: deterministic inputs enter the run, deterministic evidence comes out, and private data stays outside the repo.
+
+![Voice Agent Reliability Lab evidence map](outputs/evidence_map.svg)
